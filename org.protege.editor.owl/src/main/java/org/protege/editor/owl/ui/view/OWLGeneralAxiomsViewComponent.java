@@ -27,9 +27,23 @@ public class OWLGeneralAxiomsViewComponent extends AbstractActiveOntologyViewCom
         list = new OWLFrameList<OWLOntology>(getOWLEditorKit(),
                                               new OWLGeneralClassAxiomsFrame(getOWLEditorKit(),
                                                                              getOWLModelManager().getOWLOntologyManager()));
-        setLayout(new BorderLayout());
-        add(new JScrollPane(list));
         list.setRootObject(getOWLModelManager().getActiveOntology());
+        setLayout(new BorderLayout());
+        JScrollPane jScrollPane = new JScrollPane();
+        add(jScrollPane);
+        if(list.getModel().getSize() > 100) {
+           jScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        }
+
+        Container parent = getParent();
+        while(!parent.isValidateRoot()) {
+            parent = parent.getParent();
+        }
+        parent.validate();
+        JViewport viewport = jScrollPane.getViewport();
+        int width = viewport.getExtentSize().width;
+        list.setFixedCellWidth(width);
+        jScrollPane.setViewportView(list);
     }
 
 

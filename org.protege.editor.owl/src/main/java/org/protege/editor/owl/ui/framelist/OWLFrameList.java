@@ -1,37 +1,5 @@
 package org.protege.editor.owl.ui.framelist;
 
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Frame;
-import java.awt.Graphics;
-import java.awt.Insets;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.dnd.DropTargetDragEvent;
-import java.awt.dnd.DropTargetDropEvent;
-import java.awt.dnd.DropTargetEvent;
-import java.awt.dnd.DropTargetListener;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import javax.swing.*;
-import javax.swing.border.Border;
-import javax.swing.event.ChangeListener;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
-import javax.swing.event.MouseInputListener;
-import javax.swing.plaf.basic.BasicListUI;
-
 import org.apache.log4j.Logger;
 import org.protege.editor.core.ProtegeApplication;
 import org.protege.editor.core.prefs.Preferences;
@@ -50,29 +18,31 @@ import org.protege.editor.owl.ui.UIHelper;
 import org.protege.editor.owl.ui.axiom.AxiomAnnotationPanel;
 import org.protege.editor.owl.ui.editor.OWLObjectEditor;
 import org.protege.editor.owl.ui.explanation.ExplanationManager;
-import org.protege.editor.owl.ui.frame.AbstractOWLFrameSection;
-import org.protege.editor.owl.ui.frame.AbstractOWLFrameSectionRow;
-import org.protege.editor.owl.ui.frame.OWLFrame;
-import org.protege.editor.owl.ui.frame.OWLFrameListener;
-import org.protege.editor.owl.ui.frame.OWLFrameObject;
-import org.protege.editor.owl.ui.frame.OWLFrameSection;
-import org.protege.editor.owl.ui.frame.OWLFrameSectionRow;
+import org.protege.editor.owl.ui.frame.*;
 import org.protege.editor.owl.ui.preferences.GeneralPreferencesPanel;
 import org.protege.editor.owl.ui.renderer.LinkedObjectComponent;
 import org.protege.editor.owl.ui.renderer.LinkedObjectComponentMediator;
 import org.protege.editor.owl.ui.renderer.OWLRendererPreferences;
 import org.protege.editor.owl.ui.transfer.OWLObjectDataFlavor;
-import org.protege.editor.owl.ui.view.ChangeListenerMediator;
-import org.protege.editor.owl.ui.view.Copyable;
-import org.protege.editor.owl.ui.view.Cuttable;
-import org.protege.editor.owl.ui.view.Deleteable;
-import org.protege.editor.owl.ui.view.Pasteable;
-import org.semanticweb.owlapi.model.OWLAxiom;
-import org.semanticweb.owlapi.model.OWLEntity;
-import org.semanticweb.owlapi.model.OWLObject;
-import org.semanticweb.owlapi.model.OWLOntologyChange;
-import org.semanticweb.owlapi.model.OWLRuntimeException;
-import org.semanticweb.owlapi.model.RemoveAxiom;
+import org.protege.editor.owl.ui.view.*;
+import org.semanticweb.owlapi.model.*;
+
+import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.event.ChangeListener;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+import javax.swing.event.MouseInputListener;
+import javax.swing.plaf.basic.BasicListUI;
+import java.awt.*;
+import java.awt.dnd.DropTargetDragEvent;
+import java.awt.dnd.DropTargetDropEvent;
+import java.awt.dnd.DropTargetEvent;
+import java.awt.dnd.DropTargetListener;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 /*
  * Copyright (C) 2007, University of Manchester
@@ -131,12 +101,21 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
 
     private boolean axiomSelectionGlobal = true;
 
-
+    private boolean hyperlinkRenderingDesirable;
     public OWLFrameList(OWLEditorKit editorKit, OWLFrame<R> frame) {
+        initialize(editorKit, frame);
+
+        //setVisible(false);
+    }
+
+    private boolean mouseInTheHouse = false;
+
+    private void initialize(OWLEditorKit editorKit, OWLFrame<R> frame) {
         this.editorKit = editorKit;
         this.frame = frame;
+        this.hyperlinkRenderingDesirable = OWLRendererPreferences.getInstance().isRenderHyperlinks();
 
-        cellRenderer = new OWLFrameListRenderer(editorKit);
+        this.cellRenderer = new OWLFrameListRenderer(editorKit);
         setCellRenderer(cellRenderer);
 
         getSelectionModel().setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -147,9 +126,29 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
 
         setupKeyboardHandlers();
 
-        addComponentListener(new ComponentAdapter() {
-            public void componentResized(ComponentEvent e) {
-                setFixedCellWidth(OWLFrameList.this.getWidth());
+        addComponentListener(new ResizingComponentAdapter());
+
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                logger.info("mouse in the hole!");
+                mouseInTheHouse = true;
+                if (hyperlinkRenderingDesirable) {
+                    logger.info("desiring hyperlinking");
+                    cellRenderer.setHyperlinkingEnabled(hyperlinkRenderingDesirable);
+                    repaint();
+                }
+            }
+
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                logger.info("mouse out of the hole");
+                mouseInTheHouse = false;
+                if (hyperlinkRenderingDesirable) {
+                    cellRenderer.setHyperlinkingEnabled(false);
+                    repaint();
+                }
             }
         });
 
@@ -176,10 +175,54 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
 
         changeListenerMediator = new ChangeListenerMediator();
         addListSelectionListener(selListener);
-
         setUI(new OWLFrameListUI());
+
     }
 
+    private class ResizingComponentAdapter extends ComponentAdapter implements ActionListener {
+        private Timer timer;
+
+        public ResizingComponentAdapter() {
+            super();
+        }
+
+        public void componentResized(ComponentEvent e) {
+            if (timer == null) {
+                logger.info("resizing begins for " + (this));
+                this.timer = new Timer(500, this);
+                timer.start();
+            } else {
+                logger.info("too soon to resize " + (this));
+                timer.restart();
+            }
+
+        }
+
+        private void doResize() {
+            int oldFixedCellWidth = getFixedCellWidth();
+            logger.info("been long enough - doing a resize for  " + (this) +
+                    ": old fixedCellWidth=" + oldFixedCellWidth +
+                    ", this.width=" + getWidth());
+            logger.info("size is " + getSize());
+            logger.info("pref size is " + getPreferredSize());
+            setFixedCellWidth(getWidth());
+            //setVisible(true);
+        }
+
+        /**
+         * Invoked when an action occurs.
+         *
+         * @param e
+         */
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (e.getSource() == timer) {
+                timer.stop();
+                timer = null;
+                doResize();
+            }
+        }
+    }
 
     public void refreshComponent() {
         refillRows();
@@ -323,8 +366,13 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
     }
 
     public void setRootObject(R rootObject) {
+        R oldRootObject = frame.getRootObject();
+        if (rootObject == oldRootObject) {
+            logger.info("root object was unchanged");
+        }
         frame.setRootObject(rootObject);
         changeListenerMediator.fireStateChanged(this);
+
     }
 
     public R getRootObject() {
@@ -738,6 +786,16 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
         changeListenerMediator.removeChangeListener(changeListener);
     }
 
+    /**
+     * The ListUI caches cell heights.  Setting a fixed height and then clearing the fixed height resets this cache.
+     *
+     * @param reason
+     */
+    @Override
+    protected void clearCellHeightCache(String reason) {
+        logger.info("cell height clearing called on OWLFrameList because " + reason);
+        invalidate();
+    }
 
     public void setLayoutOrientation(int layoutOrientation) {
         throw new OWLRuntimeException("NOT ALLOWED");
@@ -831,13 +889,104 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
         }
 
 
+        @Override
+        public Dimension getPreferredSize(JComponent c) {
+            maybeUpdateLayoutState(true);
+            return super.getPreferredSize(c);
+        }
+
+        /**
+         * If updateLayoutStateNeeded is non zero, call updateLayoutState() and reset
+         * updateLayoutStateNeeded.  This method should be called by methods
+         * before doing any computation based on the geometry of the list.
+         * For example it's the first call in paint() and getPreferredSize().
+         *
+         * @see #updateLayoutState
+         */
+        @Override
+        protected void maybeUpdateLayoutState() {
+            maybeUpdateLayoutState(false);
+        }
+
+        @Override
         protected void updateLayoutState() {
+            updateLayoutState(false);
+        }
+
+        private void maybeUpdateLayoutState(boolean isGettingPreferredSize) {
+            if (this.updateLayoutStateNeeded != 0) {
+                logger.info("----begin maybe update layout state-------");
+                logger.info("update layout state is needed because:");
+                if ((updateLayoutStateNeeded & modelChanged) != 0) {
+                    logger.info("model changed");
+                }
+                if ((updateLayoutStateNeeded & selectionModelChanged) != 0) {
+                    logger.info("selectionModelChanged");
+                }
+                if ((updateLayoutStateNeeded & fontChanged) != 0) {
+                    logger.info("fontChanged");
+                }
+                if ((updateLayoutStateNeeded & fixedCellWidthChanged) != 0) {
+                    logger.info("fixedCellWidthChanged");
+                }
+                if ((updateLayoutStateNeeded & fixedCellHeightChanged) != 0) {
+                    logger.info("fixedCellHeightChanged");
+                }
+                if ((updateLayoutStateNeeded & prototypeCellValueChanged) != 0) {
+                    logger.info("prototypeCellValueChanged");
+                }
+                if ((updateLayoutStateNeeded & cellRendererChanged) != 0) {
+                    logger.info("cell renderer changed");
+                }
+                try {
+                    this.updateLayoutState(isGettingPreferredSize);
+                    logger.info("----end maybe update layout state-------");
+                } catch (Exception e) {
+                    logger.error("Caught Exception", e); //To change body of catch statement use File | Settings | File Templates.
+                }
+                this.updateLayoutStateNeeded = 0;
+
+            }
+        }
+
+        private void estimatePreferredSize() {
+            ListCellRenderer cellRenderer = list.getCellRenderer();
+            logger.info("Estimating Pref Size - cell renderer is an instance of " + cellRenderer.getClass());
+            setPreferredSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        }
+
+
+        private void updateLayoutState(boolean isGettingPreferredSize) {
+            logger.info("parent is " + getParent());
+            if (cellWidth == list.getFixedCellWidth() && cellWidth > 0) {
+                logger.info("width is unchanged from " + cellWidth);
+            }
+            if (list.getParent() != null) {
+                int parentWidth = list.getParent().getWidth();
+                if (parentWidth > 0) {
+                    logger.info("parent width is " + parentWidth);
+                } else {
+                    logger.info("no parent width - " + parentWidth);
+                    /*if (isGettingPreferredSize) {
+                        estimatePreferredSize();
+                        return;
+                    } */
+                }
+            } else {
+                logger.info("no parent");
+            }
+            logger.info("list visibility:" + list.isVisible());
+            logger.info("list showing:" + list.isShowing());
+            logger.info("list valid:" + list.isValid());
+
             cumulativeCellHeight = new int[list.getModel().getSize()];
+
             /*
                 * If both JList fixedCellWidth and fixedCellHeight have been set,
                 * then initialize cellWidth and cellHeight, and set cellHeights to
                 * null.
                 */
+
             int fixedCellHeight = list.getFixedCellHeight();
             int fixedCellWidth = list.getFixedCellWidth();
             cellWidth = fixedCellWidth != -1 ? fixedCellWidth : -1;
@@ -862,6 +1011,8 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
                 ListCellRenderer renderer = list.getCellRenderer();
                 if (renderer != null) {
                     int cumulativeHeight = 0;
+                    boolean savedHyper = cellRenderer.isHyperlinkingEnabled();
+                    cellRenderer.setHyperlinkingEnabled(false);
                     for (int index = 0; index < dataModelSize; index++) {
                         Object value = dataModel.getElementAt(index);
                         if (isFixedCellHeightRow(index)) {
@@ -870,11 +1021,22 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
                             }
                         }
                         else {
-                            Component c = renderer.getListCellRendererComponent(list, value, index, false, false);
+                            Component c;
+                            if (renderer instanceof OWLFrameListRenderer) {
+                                OWLFrameListRenderer owlFrameListRenderer = (OWLFrameListRenderer) renderer;
+                                boolean savedHyperLinkingEnabled = owlFrameListRenderer.isHyperlinkingEnabled();
+                                owlFrameListRenderer.setHyperlinkingEnabled(false);
+                                c = owlFrameListRenderer.getListCellRendererComponent(list, value, index, false, false);
+                                owlFrameListRenderer.setHyperlinkingEnabled(savedHyperLinkingEnabled);
+                            } else {
+                                c = renderer.getListCellRendererComponent(list, value, index, false, false);
+                            }
                             rendererPane.add(c);
                             Dimension cellSize = c.getPreferredSize();
                             if (fixedCellWidth == -1) {
-                                cellWidth = Math.max(cellSize.width, cellWidth);
+                                if (cellSize.width >= cellWidth) {
+                                    cellWidth = cellSize.width;
+                                }
                             }
                             if (fixedCellHeight == -1) {
                                 cellHeights[index] = cellSize.height;
@@ -883,6 +1045,8 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
                         cumulativeHeight += cellHeights[index];
                         cumulativeCellHeight[index] = cumulativeHeight;
                     }
+                    cellRenderer.setHyperlinkingEnabled(savedHyper);
+                    setPreferredSize(new Dimension(cellWidth, cumulativeHeight));
                 }
                 else {
                     if (cellWidth == -1) {
@@ -896,6 +1060,7 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
                     }
                 }
             }
+
         }
 
 
@@ -934,9 +1099,6 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
                 return new Rectangle();
             }
             maybeUpdateLayoutState();
-            if (index >= cumulativeCellHeight.length) {
-                return null;
-            }
             Insets insets = list.getInsets();
             int x;
             int w;
@@ -962,16 +1124,30 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
          * @see #paint
          */
 
-        protected void paintCell(Graphics g, int row, Rectangle rowBounds, ListCellRenderer cellRenderer, ListModel dataModel, ListSelectionModel selModel, int leadIndex) {
+        protected void paintCell(Graphics g, int row, Rectangle rowBounds, ListCellRenderer listCellRenderer, ListModel dataModel, ListSelectionModel selModel, int leadIndex) {
             Object value = dataModel.getElementAt(row);
             boolean cellHasFocus = list.hasFocus() && row == leadIndex;
             boolean isSelected = selModel.isSelectedIndex(row);
-            Component rendererComponent = cellRenderer.getListCellRendererComponent(list, value, row, isSelected, cellHasFocus);
+            boolean saved = cellRenderer.isHyperlinkingEnabled();
+            if (mouseInTheHouse) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Mouse in the hole: hypering desirable: " + hyperlinkRenderingDesirable + ", saved: " + saved);
+                }
+            }
+            cellRenderer.setHyperlinkingEnabled(mouseInTheHouse && saved);
+
+            Component rendererComponent = listCellRenderer.getListCellRendererComponent(list, value, row, isSelected, cellHasFocus);
+
+
             int cx = rowBounds.x;
             int cy = rowBounds.y;
             int cw = rowBounds.width;
             int ch = rowBounds.height;
             rendererPane.paintComponent(g, rendererComponent, list, cx, cy, cw, ch, true);
+            cellRenderer.setHyperlinkingEnabled(saved);
+
         }
     }
+
+
 }

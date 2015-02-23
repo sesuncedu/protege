@@ -44,6 +44,7 @@ public class OWLFrameListRenderer implements ListCellRenderer {
 
     private boolean annotationRendererEnabled;
 
+    private boolean hyperlinkingEnabled;
     public OWLFrameListRenderer(OWLEditorKit owlEditorKit) {
         this.owlEditorKit = owlEditorKit;
         owlCellRenderer = new OWLCellRenderer(owlEditorKit);
@@ -54,6 +55,7 @@ public class OWLFrameListRenderer implements ListCellRenderer {
         highlightUnsatisfiableProperties = true;
         annotationRendererEnabled = true;
         crossedOutEntities = new HashSet<OWLEntity>();
+        hyperlinkingEnabled = OWLRendererPreferences.getInstance().isRenderHyperlinks();
     }
 
 
@@ -108,6 +110,7 @@ public class OWLFrameListRenderer implements ListCellRenderer {
      * of a list because the list cells do not have a fixed size, this method
      * is called to generate a component on which <code>getPreferredSize</code>
      * can be invoked.
+     *
      * @param list         The JList we're painting.
      * @param value        The value returned by list.getModel().getElementAt(index).
      * @param index        The cells index.
@@ -121,17 +124,15 @@ public class OWLFrameListRenderer implements ListCellRenderer {
     public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected,
                                                   boolean cellHasFocus) {
 
-
         if (value instanceof OWLFrameSection) {
             JLabel label = (JLabel) separatorRenderer.getListCellRendererComponent(list,
-                                                                                   " ",
-                                                                                   index,
-                                                                                   isSelected,
-                                                                                   cellHasFocus);
+                    " ",
+                    index,
+                    isSelected,
+                    cellHasFocus);
             label.setVerticalAlignment(JLabel.TOP);
             return label;
-        }
-        else {
+        } else {
             final AbstractOWLFrameSectionRow row = (AbstractOWLFrameSectionRow) value;
             final OWLAxiom axiom = row.getAxiom();
             if (axiom instanceof OWLAnnotationAssertionAxiom && annotationRendererEnabled) {
@@ -143,10 +144,10 @@ public class OWLFrameListRenderer implements ListCellRenderer {
                         getAnnotationLiteralDatatypeRendering()
                 );
                 return annotationRenderer.getListCellRendererComponent(list,
-                                                                       annotationAssertionAxiom,
-                                                                       index,
-                                                                       isSelected,
-                                                                       cellHasFocus);
+                        annotationAssertionAxiom,
+                        index,
+                        isSelected,
+                        cellHasFocus);
             }
 
             boolean commentedOut = false;
@@ -158,11 +159,11 @@ public class OWLFrameListRenderer implements ListCellRenderer {
             owlCellRenderer.setHighlightKeywords(highlightKeywords);
             owlCellRenderer.setHighlightUnsatisfiableClasses(highlightUnsatisfiableClasses);
             owlCellRenderer.setCrossedOutEntities(crossedOutEntities);
-            return owlCellRenderer.getListCellRendererComponent(list,
-                                                                valueToRender,
-                                                                index,
-                                                                isSelected,
-                                                                cellHasFocus);
+             boolean savedHyperlinkingEnabled = owlCellRenderer.isHyperlinkingEnabled();
+            owlCellRenderer.setHyperlinkingEnabled(isHyperlinkingEnabled());
+            Component result = owlCellRenderer.getListCellRendererComponent(list, valueToRender, index, isSelected, cellHasFocus);
+            owlCellRenderer.setHyperlinkingEnabled(savedHyperlinkingEnabled);
+            return result;
         }
     }
 
@@ -198,5 +199,13 @@ public class OWLFrameListRenderer implements ListCellRenderer {
             value = ((AbstractOWLFrameSectionRow) value).getRendering();
         }
         return value;
+    }
+
+    public boolean isHyperlinkingEnabled() {
+        return hyperlinkingEnabled;
+    }
+
+    public void setHyperlinkingEnabled(boolean hyperlinkingEnabled) {
+        this.hyperlinkingEnabled = hyperlinkingEnabled;
     }
 }

@@ -1,17 +1,15 @@
 package org.protege.editor.core.ui.list;
 
+import org.apache.log4j.Logger;
+
+import javax.swing.*;
+import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import javax.swing.*;
-import javax.swing.border.Border;
-import javax.swing.border.MatteBorder;
-import javax.swing.event.ListDataEvent;
-import javax.swing.event.ListDataListener;
 
 /**
  * Author: Matthew Horridge<br>
@@ -21,7 +19,7 @@ import javax.swing.event.ListDataListener;
  * <br>
  */
 public class MList extends JList {
-
+    private static Logger logger = Logger.getLogger(MList.class);
     /**
      *
      */
@@ -138,25 +136,28 @@ public class MList extends JList {
             public void hierarchyChanged(HierarchyEvent e) {
                 if (isShowing() != showing) {
                     showing = isShowing();
-                    clearCellHeightCache();
+                    //clearCellHeightCache("showing changed");
                 }
             }
         });
         addComponentListener(new ComponentAdapter() {
+
             public void componentResized(ComponentEvent e) {
-                clearCellHeightCache();
+                clearCellHeightCache("resizing: " + e.toString());
             }
 
             public void componentShown(ComponentEvent e) {
-                clearCellHeightCache();
+                //clearCellHeightCache("Showing: "+e.toString());
             }
         });
     }
 
     /**
      * The ListUI caches cell heights.  Setting a fixed height and then clearing the fixed height resets this cache.
+     * @param reason
      */
-    protected void clearCellHeightCache() {
+    protected void clearCellHeightCache(String reason) {
+      logger.info("Clearing cell height because " + reason);
         setFixedCellHeight(10);
         setFixedCellHeight(-1);
     }

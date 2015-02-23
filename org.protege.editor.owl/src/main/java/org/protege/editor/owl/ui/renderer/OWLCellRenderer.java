@@ -1,35 +1,5 @@
 package org.protege.editor.owl.ui.renderer;
 
-import java.awt.*;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.StringTokenizer;
-
-import javax.swing.Icon;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JTable;
-import javax.swing.JTextPane;
-import javax.swing.JTree;
-import javax.swing.ListCellRenderer;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.table.TableCellRenderer;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Style;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.StyledDocument;
-import javax.swing.text.View;
-import javax.swing.tree.TreeCellRenderer;
-
 import org.apache.log4j.Logger;
 import org.protege.editor.core.ProtegeApplication;
 import org.protege.editor.core.ui.list.LegacyRenderer;
@@ -37,20 +7,18 @@ import org.protege.editor.owl.OWLEditorKit;
 import org.protege.editor.owl.model.OWLModelManager;
 import org.protege.editor.owl.model.inference.ReasonerPreferences.OptionalInferenceTask;
 import org.protege.editor.owl.model.util.OWLUtilities;
-import org.protege.editor.owl.ui.OWLIcons;
-import org.semanticweb.owlapi.model.IRI;
-import org.semanticweb.owlapi.model.OWLAnnotationProperty;
-import org.semanticweb.owlapi.model.OWLClass;
-import org.semanticweb.owlapi.model.OWLDataProperty;
-import org.semanticweb.owlapi.model.OWLDatatype;
-import org.semanticweb.owlapi.model.OWLDeclarationAxiom;
-import org.semanticweb.owlapi.model.OWLEntity;
-import org.semanticweb.owlapi.model.OWLEntityVisitor;
-import org.semanticweb.owlapi.model.OWLNamedIndividual;
-import org.semanticweb.owlapi.model.OWLObject;
-import org.semanticweb.owlapi.model.OWLObjectProperty;
-import org.semanticweb.owlapi.model.OWLOntology;
+import org.semanticweb.owlapi.model.*;
 import org.semanticweb.owlapi.reasoner.OWLReasoner;
+
+import javax.swing.*;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.text.*;
+import javax.swing.tree.TreeCellRenderer;
+import java.awt.*;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.*;
+import java.util.List;
 
 
 /**
@@ -136,6 +104,14 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
     private int plainFontHeight;
 
     private boolean opaque = false;
+
+    public boolean isHyperlinkingEnabled() {
+        return hyperlinkingEnabled;
+    }
+
+    public void setHyperlinkingEnabled(boolean hyperlinkingEnabled) {
+        this.hyperlinkingEnabled = hyperlinkingEnabled;
+    }
 
 
     private class OWLCellRendererPanel extends JPanel implements LegacyRenderer {
@@ -352,7 +328,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
     ////////////////////////////////////////////////////////////////////////////////////////
 
     private boolean renderLinks;
-
+    private boolean hyperlinkingEnabled;
 
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
                                                    int row, int column) {
@@ -361,7 +337,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
         componentBeingRendered = table;
         // Set the size of the table cell
 //        setPreferredWidth(table.getColumnModel().getColumn(column).getWidth());
-        return prepareRenderer(value, isSelected, hasFocus);
+        return prepareRenderer(isSelected, value);
 
 //        // This is a bit messy - the row height doesn't get reset if it is larger than the
 //        // desired row height.
@@ -389,7 +365,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
                                                   boolean leaf, int row, boolean hasFocus) {
         componentBeingRendered = tree;
         Rectangle cellBounds = new Rectangle();
-        if (!gettingCellBounds) {
+        if (tree.isValid() && !gettingCellBounds) {
             gettingCellBounds = true;
             cellBounds = tree.getRowBounds(row);
             gettingCellBounds = false;
@@ -399,18 +375,17 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
         minTextHeight = 12;
 //        textPane.setBorder(BorderFactory.createEmptyBorder(1, 2, 1, 2 + rightMargin));
         tree.setToolTipText(value != null ? value.toString() : "");
-        Component c = prepareRenderer(value, selected, hasFocus);
+        Component c = prepareRenderer(selected, value);
         reset();
         return c;
     }
-
 
     public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected,
                                                   boolean cellHasFocus) {
         componentBeingRendered = list;
         Rectangle cellBounds = new Rectangle();
         // We need to prevent infinite recursion here!
-        if (!gettingCellBounds) {
+        if (isHyperlinkingEnabled() && !gettingCellBounds) {
             gettingCellBounds = true;
             cellBounds = list.getCellBounds(index, index);
             gettingCellBounds = false;
@@ -422,7 +397,8 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
 //        preferredWidth = -1;
 //        textPane.setBorder(BorderFactory.createEmptyBorder(1, 2, 1, 2 + rightMargin));
         setupLinkedObjectComponent(list, cellBounds);
-        Component c = prepareRenderer(value, isSelected, cellHasFocus);
+
+        Component c = prepareRenderer(isSelected, value);
         reset();
         return c;
     }
@@ -432,6 +408,12 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
         renderLinks = false;
         linkedObjectComponent = null;
         if (cellRect == null) {
+            return;
+        }
+        if (cellRect.getHeight() == 0 || cellRect.getWidth() == 0) {
+            return;
+        }
+        if(!isHyperlinkingEnabled()) {
             return;
         }
         if (component instanceof LinkedObjectComponent && OWLRendererPreferences.getInstance().isRenderHyperlinks()) {
@@ -494,7 +476,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
     private ActiveEntityVisitor activeEntityVisitor = new ActiveEntityVisitor();
 
 
-    private Component prepareRenderer(Object value, boolean isSelected, boolean hasFocus) {
+    private Component prepareRenderer(boolean isSelected, Object value) {
         renderingComponent.setOpaque(isSelected || opaque);
 
         if (value instanceof OWLEntity) {
@@ -777,7 +759,9 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
 
             tokenStartIndex += curToken.length();
         }
-        if (renderLinks && !linkRendered) {
+       // boolean b = !isSizing;
+        boolean b = true;
+        if (b && renderLinks && !linkRendered) {
             linkedObjectComponent.setLinkedObject(null);
         }
     }
@@ -844,7 +828,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
                 }
                 strikeoutEntityIfCrossedOut(curEntity, doc, tokenStartIndex, tokenLength);
 
-                if (renderLinks) {
+                if (isHyperlinkingEnabled() && renderLinks) {
                     renderHyperlink(curEntity, tokenStartIndex, tokenLength, doc);
                 }
             }
@@ -1065,7 +1049,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
             Insets insets = parent.getInsets();
             Insets rcInsets = renderingComponent.getInsets();
 
-            if (preferredWidth != -1) {
+            if (preferredWidth > 0) {
                 textWidth = preferredWidth - iconWidth - rcInsets.left - rcInsets.right;
                 View v = textPane.getUI().getRootView(textPane);
                 v.setSize(textWidth, Integer.MAX_VALUE);
@@ -1107,7 +1091,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
 
             iconWidth = iconLabel.getPreferredSize().width;
             iconHeight = iconLabel.getPreferredSize().height;
-            if (preferredWidth != -1) {
+            if (preferredWidth > 0) {
                 textWidth = preferredWidth - iconWidth - rcInsets.left - rcInsets.right;
                 View v = textPane.getUI().getRootView(textPane);
                 v.setSize(textWidth, Integer.MAX_VALUE);
