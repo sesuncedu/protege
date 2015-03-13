@@ -43,6 +43,7 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 /*
  * Copyright (C) 2007, University of Manchester
@@ -223,9 +224,34 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
             }
         }
     }
+    private class RefillRowsWorker extends SwingWorker<List<OWLFrameObject>,Void> {
+
+        @Override
+        protected List<OWLFrameObject> doInBackground() throws Exception {
+            return grefillRows();
+        }
+
+
+        @Override
+        protected void done() {
+            try {
+                setListData(get().toArray());
+                Container parent = getParent();
+                while(!parent.isValidateRoot()) {
+                    parent = parent.getParent();
+                }
+                parent.revalidate();
+                parent.repaint();
+            } catch (InterruptedException e) {
+                logger.error("Caught Exception", e); //To change body of catch statement use File | Settings | File Templates.
+            } catch (ExecutionException e) {
+                logger.error("Caught Exception", e); //To change body of catch statement use File | Settings | File Templates.
+            }
+        }
+    }
 
     public void refreshComponent() {
-        refillRows();
+        new RefillRowsWorker().execute();
     }
 
     public OWLFrame<R> getFrame() {
@@ -235,7 +261,7 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
     private void setupFrameListener() {
         listener = new OWLFrameListener() {
             public void frameContentChanged() throws Exception {
-                refillRows();
+                refreshComponent();
             }
         };
         frame.addFrameListener(listener);
@@ -365,14 +391,13 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
         }
     }
 
-    public void setRootObject(R rootObject) {
+    public void setRootObject(final R rootObject) {
         R oldRootObject = frame.getRootObject();
         if (rootObject == oldRootObject) {
             logger.info("root object was unchanged");
         }
         frame.setRootObject(rootObject);
         changeListenerMediator.fireStateChanged(this);
-
     }
 
     public R getRootObject() {
@@ -398,7 +423,7 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
         frame.dispose();
     }
 
-    private void refillRows() {
+    private List<OWLFrameObject> grefillRows() {
         List<OWLFrameObject> rows = new ArrayList<OWLFrameObject>();
         for (OWLFrameSection<R, ? extends Object, ? extends Object> section : frame.getFrameSections()) {
             rows.add(section);
@@ -406,7 +431,7 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
                 rows.add(row);
             }
         }
-        setListData(rows.toArray());
+        return rows;
     }
 
     public boolean canDelete() {
@@ -795,6 +820,7 @@ public class OWLFrameList<R> extends MList implements LinkedObjectComponent, Dro
     protected void clearCellHeightCache(String reason) {
         logger.info("cell height clearing called on OWLFrameList because " + reason);
         invalidate();
+        repaint();
     }
 
     public void setLayoutOrientation(int layoutOrientation) {

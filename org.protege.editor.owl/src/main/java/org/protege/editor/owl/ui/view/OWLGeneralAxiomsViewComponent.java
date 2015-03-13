@@ -29,12 +29,8 @@ public class OWLGeneralAxiomsViewComponent extends AbstractActiveOntologyViewCom
                                                                              getOWLModelManager().getOWLOntologyManager()));
         list.setRootObject(getOWLModelManager().getActiveOntology());
         setLayout(new BorderLayout());
-        JScrollPane jScrollPane = new JScrollPane();
+        JScrollPane jScrollPane = new JScrollPane(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         add(jScrollPane);
-        if(list.getModel().getSize() > 100) {
-           jScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-        }
-
         Container parent = getParent();
         while(!parent.isValidateRoot()) {
             parent = parent.getParent();
@@ -44,6 +40,8 @@ public class OWLGeneralAxiomsViewComponent extends AbstractActiveOntologyViewCom
         int width = viewport.getExtentSize().width;
         list.setFixedCellWidth(width);
         jScrollPane.setViewportView(list);
+        parent.revalidate();
+        parent.repaint();
     }
 
 
@@ -54,5 +52,6 @@ public class OWLGeneralAxiomsViewComponent extends AbstractActiveOntologyViewCom
 
     protected void updateView(OWLOntology activeOntology) throws Exception {
         list.setRootObject(activeOntology);
+        list.refreshComponent();
     }
 }

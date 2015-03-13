@@ -818,7 +818,7 @@ public class OWLCellRenderer implements TableCellRenderer, TreeCellRenderer, Lis
 
                 }
                 else if (highlightUnsatisfiableProperties && curEntity instanceof OWLObjectProperty) {
-                    highlightPropertyIfUnsatisfiable(curEntity, doc, tokenStartIndex, tokenLength);
+                     highlightPropertyIfUnsatisfiable(curEntity, doc, tokenStartIndex, tokenLength);
                 }
                 if(OWLUtilities.isDeprecated(owlEditorKit.getOWLModelManager(), curEntity)) {
                     setStrikeThrough(true);

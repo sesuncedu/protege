@@ -136,7 +136,7 @@ public class MList extends JList {
             public void hierarchyChanged(HierarchyEvent e) {
                 if (isShowing() != showing) {
                     showing = isShowing();
-                    //clearCellHeightCache("showing changed");
+                    clearCellHeightCache("showing changed");
                 }
             }
         });
@@ -147,7 +147,7 @@ public class MList extends JList {
             }
 
             public void componentShown(ComponentEvent e) {
-                //clearCellHeightCache("Showing: "+e.toString());
+                clearCellHeightCache("Showing: "+e.toString());
             }
         });
     }
